@@ -1,0 +1,36 @@
+# Stage 1: The Build Stage
+# Use the official Go image for compilation.
+FROM golang:1.21-alpine AS builder
+
+# Set the current working directory inside the container
+WORKDIR /app
+
+# Copy module definition files
+# This helps cache the dependencies layer.
+COPY go.mod .
+# Although not strictly required for this project since it has no external dependencies, 
+# it's best practice to copy go.sum as well if it existed. 
+
+# Download dependencies (this step will be very fast as there are none)
+# RUN go mod download 
+
+# Copy the application source code
+COPY main.go .
+COPY fibonacci_test.go .
+
+# Build the application
+# CGO_ENABLED=0 creates a statically linked binary for maximum portability.
+# We explicitly output the binary to /fibonacci_cli.
+RUN CGO_ENABLED=0 go build -o /fibonacci_cli main.go
+
+
+# Stage 2: The Final (Minimal) Runtime Stage
+# Use 'scratch', the smallest possible base image, which has a size of 0MB.
+FROM scratch
+
+# Copy the statically linked binary from the builder stage
+# The final image will be tiny (just the Go runtime binary, around 5-15MB).
+COPY --from=builder /fibonacci_cli /fibonacci
+
+# Define the entry point for the container.
+ENTRYPOINT ["/fibonacci"]
